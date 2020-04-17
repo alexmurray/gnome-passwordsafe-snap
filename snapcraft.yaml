@@ -1,0 +1,67 @@
+name: gnome-passwordsafe
+adopt-info: gnome-passwordsafe
+base: core18 # need core20 for a newer libgtk
+grade: stable
+confinement: strict
+license: GPL-3.0+
+
+slots:
+  # for GtkApplication registration
+  gnome-passwordsafe:
+    interface: dbus
+    bus: session
+    name: org.gnome.PasswordSafe
+
+apps:
+  gnome-passwordsafe:
+    command: gnome-passwordsafe
+    extensions: [gnome-3-34]
+    plugs:
+      - home
+    common-id: org.gnome.PasswordSafe
+    desktop: usr/share/applications/org.gnome.PasswordSafe
+
+parts:
+  gnome-passwordsafe:
+    after: [libhandy, pykeepass]
+    source: https://gitlab.gnome.org/World/PasswordSafe/-/archive/3.99.2/PasswordSafe-3.99.2.tar.gz
+    plugin: meson
+    meson-parameters: [--prefix=/snap/gnome-passwordsafe/current/usr]
+    organize:
+      snap/gnome-passwordsafe/current/usr: usr
+    parse-info: [usr/share/metainfo/org.gnome.PasswordSafe.appdata.xml]
+    build-packages:
+      - libpwquality-dev
+      - python3-construct
+    stage-packages:
+      - python3-gi
+    override-build: |
+      # use system python3 otherwise it uses gnome extension python3 which
+      # can't find contruct or pykeepass modules
+      sed -i "s|find_installation('python3')|find_installation('/usr/bin/python3')|" meson.build
+      sed -i 's|# Python Module Check|message(python_bin.path())|' meson.build
+      snapcraftctl build
+
+  libhandy:
+    source: https://source.puri.sm/Librem5/libhandy/-/archive/v0.0.13/libhandy-v0.0.13.tar.gz
+    plugin: meson
+    meson-parameters:
+      - -Dvapi=false
+      - -Dtests=false
+      - -Dexamples=false
+      - -Dintrospection=disabled
+      - -Dglade_catalog=disabled
+      - -Dbuildtype=release
+    build-packages:
+      - gcc
+      - libgtk-3-dev
+
+  # pykeepass needs to be installed as a global python module so that it
+  # can be detected by meson during build time
+  pykeepass:
+    plugin: nil
+    build-packages:
+      - python3-pip
+    override-build: |
+      pip3 install pykeepass
+      snapcraftctl build
